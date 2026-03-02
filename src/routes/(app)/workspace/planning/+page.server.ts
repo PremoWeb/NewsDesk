@@ -65,10 +65,11 @@ export const load: PageServerLoad = async ({ locals }) => {
 
 export const actions: Actions = {
 	createEvent: async ({ request, locals }) => {
-		const createdBy = locals.user?.id;
-		if (!createdBy) {
+		const user = locals.user;
+		if (!user) {
 			return fail(401, { message: 'Unauthorized' });
 		}
+		const createdBy = user.id;
 
 		const data = await request.formData();
 		const title = data.get('title') as string;
@@ -115,10 +116,11 @@ export const actions: Actions = {
 	},
 
 	createItem: async ({ request, locals }) => {
-		const createdBy = locals.user?.id;
-		if (!createdBy) {
+		const user = locals.user;
+		if (!user) {
 			return fail(401, { message: 'Unauthorized' });
 		}
+		const createdBy = user.id;
 
 		const data = await request.formData();
 		const eventId = (data.get('eventId') as string) || null;

@@ -1,11 +1,12 @@
 import { auth } from '$lib/server/auth';
 import { svelteKitHandler } from 'better-auth/svelte-kit';
 import { building } from '$app/environment';
+import type { RequestHandler } from './$types';
 
-export const GET = async (event) => {
+export const GET: RequestHandler = async (event) => {
 	return svelteKitHandler({ event, resolve: () => new Response(), auth, building });
 };
 
-export const POST = async (event) => {
+export const POST: RequestHandler = async (event) => {
 	return svelteKitHandler({ event, resolve: () => new Response(), auth, building });
 };
