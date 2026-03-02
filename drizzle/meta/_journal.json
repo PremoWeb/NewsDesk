@@ -29,6 +29,13 @@
       "when": 1772409359601,
       "tag": "0003_add_read_time_to_article",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1772419282400,
+      "tag": "0004_magenta_bloodstrike",
+      "breakpoints": true
     }
   ]
 }

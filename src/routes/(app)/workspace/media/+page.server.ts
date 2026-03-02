@@ -7,13 +7,15 @@ import { writeFile, mkdir } from 'fs/promises';
 import { join } from 'path';
 import type { PageServerLoad, Actions } from './$types';
 
-export const load: PageServerLoad = async ({ cookies }) => {
+async function getSessionUser(cookies: Parameters<PageServerLoad>[0]['cookies']) {
 	const sessionName = cookies.get('nd_session');
-	let currentUser = null;
-	if (sessionName) {
-		const found = await db.select({ id: user.id, name: user.name }).from(user).where(like(user.name, sessionName)).limit(1);
-		currentUser = found[0] ?? null;
-	}
+	if (!sessionName) return null;
+	const found = await db.select({ id: user.id, name: user.name }).from(user).where(like(user.name, sessionName)).limit(1);
+	return found[0] ?? null;
+}
+
+export const load: PageServerLoad = async ({ cookies }) => {
+	const currentUser = await getSessionUser(cookies);
 	const assets = await db
 		.select({
 			id: mediaAsset.id,
@@ -47,11 +49,13 @@ export const load: PageServerLoad = async ({ cookies }) => {
 
 export const actions: Actions = {
 	upload: async ({ request, cookies }) => {
-		const sessionName = cookies.get('nd_session');
-		const uploaderRows = sessionName
-			? await db.select({ id: user.id }).from(user).where(like(user.name, sessionName)).limit(1)
-			: [];
-		const uploadedBy = uploaderRows[0]?.id ?? null;
+		const currentUser = await getSessionUser(cookies);
+		// Fall back to first user in DB during dev if session not found
+		const fallbackUser = currentUser ?? (await db.select({ id: user.id }).from(user).limit(1))[0];
+		if (!fallbackUser) {
+			return fail(401, { message: 'Not authenticated' });
+		}
+		const uploadedBy = fallbackUser.id;
 
 		const data = await request.formData();
 		const file = data.get('file') as File | null;

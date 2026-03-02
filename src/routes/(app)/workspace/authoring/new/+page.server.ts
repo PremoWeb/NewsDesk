@@ -78,16 +78,17 @@ export const actions: Actions = {
 		if (tagNames.length > 0) {
 			for (const name of tagNames) {
 				const tagSlug = name.replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
-				// Find or create tag (check-first to avoid unique constraint errors)
-				let [existingTag] = await db.select({ id: tag.id }).from(tag).where(eq(tag.name, name)).limit(1);
-				if (!existingTag) {
-					const [inserted] = await db
-						.insert(tag)
-						.values({ id: nanoid(), name, slug: tagSlug })
-						.returning({ id: tag.id });
-					existingTag = inserted;
+				// Upsert tag atomically: insert with ON CONFLICT DO NOTHING, then re-fetch if needed
+				const [inserted] = await db
+					.insert(tag)
+					.values({ id: nanoid(), name, slug: tagSlug })
+					.onConflictDoNothing()
+					.returning({ id: tag.id });
+				const tagId = inserted?.id ??
+					(await db.select({ id: tag.id }).from(tag).where(eq(tag.name, name)).limit(1))[0]?.id;
+				if (tagId) {
+					await db.insert(articleTag).values({ articleId: id, tagId }).onConflictDoNothing();
 				}
-				await db.insert(articleTag).values({ articleId: id, tagId: existingTag.id }).onConflictDoNothing();
 			}
 		}
 
