@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { browser } from '$app/environment';
+	import { onMount } from 'svelte';
 	import TopNav from './TopNav.svelte';
 	import MainMenuPanel from './MainMenuPanel.svelte';
 	import BottomBar from './BottomBar.svelte';
@@ -7,10 +7,18 @@
 	let { children } = $props();
 
 	let menuOpen = $state(false);
-	let menuPinned = $state(browser ? localStorage.getItem('menu-pinned') === 'true' : false);
+	let menuPinned = $state(false);
+	let mounted = $state(false);
+
+	onMount(() => {
+		menuPinned = localStorage.getItem('menu-pinned') === 'true';
+		if (menuPinned) menuOpen = true;
+		mounted = true;
+	});
 
 	$effect(() => {
-		if (browser) localStorage.setItem('menu-pinned', String(menuPinned));
+		if (!mounted) return;
+		localStorage.setItem('menu-pinned', String(menuPinned));
 		if (menuPinned) menuOpen = true;
 	});
 

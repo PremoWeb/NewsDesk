@@ -14,10 +14,13 @@ export default defineConfig({
 	],
 	server: {
 		port: 5173,
-		strictPort: true
+		strictPort: true,
+		hmr: {
+			port: 5173
+		}
 	},
 	ssr: {
-		noExternal: ['svelte-sonner', 'better-auth']
+		noExternal: ['svelte-sonner']
 	},
 	test: {
 		expect: { requireAssertions: true },
