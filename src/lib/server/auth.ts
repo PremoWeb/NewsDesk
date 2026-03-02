@@ -6,6 +6,7 @@ import { db } from '$lib/server/db';
 import { user, session, account, verification } from '$lib/server/db/auth.schema';
 
 export const auth = betterAuth({
+	baseURL: process.env.BETTER_AUTH_URL ?? 'http://localhost:5173',
 	emailAndPassword: {
 		enabled: true
 	},
