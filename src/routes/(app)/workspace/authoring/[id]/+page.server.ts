@@ -1,16 +1,10 @@
 import { db } from '$lib/server/db';
 import { article, user, tag, articleTag, category, articleCategory, customField, articleCustomFieldValue, articleComment } from '$lib/server/db/schema';
-import { eq, desc, like } from 'drizzle-orm';
+import { eq, desc } from 'drizzle-orm';
 import { fail, redirect, error } from '@sveltejs/kit';
 import { nanoid } from 'nanoid';
 import type { Actions, PageServerLoad } from './$types';
 
-async function getSessionUser(cookies: { get: (name: string) => string | undefined }) {
-	const sessionName = cookies.get('nd_session');
-	if (!sessionName) return null;
-	const [found] = await db.select({ id: user.id, name: user.name }).from(user).where(like(user.name, sessionName)).limit(1);
-	return found ?? null;
-}
 
 export const load: PageServerLoad = async ({ params }) => {
 	const [art] = await db
@@ -218,14 +212,13 @@ export const actions: Actions = {
 		redirect(303, '/workspace/authoring');
 	},
 
-	addComment: async ({ request, params, cookies }) => {
+	addComment: async ({ request, params, locals }) => {
 		const data = await request.formData();
 		const body = data.get('body')?.toString().trim();
 
 		if (!body) return fail(400, { commentError: 'Comment cannot be empty' });
 
-		const currentUser = await getSessionUser(cookies);
-		const fallbackUser = currentUser ?? (await db.select({ id: user.id }).from(user).limit(1))[0];
+		const fallbackUser = locals.user ?? (await db.select({ id: user.id }).from(user).limit(1))[0];
 		if (!fallbackUser) return fail(401, { commentError: 'Not authenticated' });
 
 		await db.insert(articleComment).values({

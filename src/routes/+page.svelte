@@ -1,9 +1,31 @@
 <script lang="ts">
-import { enhance } from '$app/forms';
-import type { ActionData } from './$types';
+import { signIn } from '$lib/auth-client';
+import { goto } from '$app/navigation';
 
-let { form }: { form: ActionData } = $props();
+let email = $state('');
+let password = $state('');
+let error = $state('');
 let loading = $state(false);
+
+async function handleSubmit(e: Event) {
+	e.preventDefault();
+	error = '';
+	loading = true;
+
+	try {
+		const result = await signIn.email({ email, password });
+
+		if ('error' in result && result.error) {
+			error = result.error.message || 'Failed to sign in';
+		} else {
+			goto('/workspace/monitoring');
+		}
+	} catch (err) {
+		error = err instanceof Error ? err.message : 'An error occurred';
+	} finally {
+		loading = false;
+	}
+}
 </script>
 
 <svelte:head>
@@ -17,32 +39,25 @@ let loading = $state(false);
 </div>
 
 <div class="form-handler">
-{#if form?.error}
+{#if error}
 <div class="error-handler">
-<p class="error">{form.error}</p>
+<p class="error">{error}</p>
 </div>
 {/if}
 
 <form
-method="POST"
-action="?/login"
-use:enhance={() => {
-loading = true;
-return async ({ update }) => {
-await update({ reset: false });
-loading = false;
-};
-}}
+onsubmit={handleSubmit}
 >
 <fieldset class="inputs">
 <input
-type="text"
-name="username"
-placeholder="username"
+type="email"
+name="email"
+placeholder="email"
 class="fullwidth-input"
-autocomplete="username"
+autocomplete="email"
 required
 disabled={loading}
+bind:value={email}
 />
 <input
 type="password"
@@ -52,6 +67,7 @@ class="fullwidth-input"
 autocomplete="current-password"
 required
 disabled={loading}
+bind:value={password}
 />
 </fieldset>
 

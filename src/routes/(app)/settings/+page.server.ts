@@ -1,18 +1,12 @@
 import { db } from '$lib/server/db';
 import { category, customField, desk, stage, user } from '$lib/server/db/schema';
-import { eq, asc, like } from 'drizzle-orm';
+import { eq, asc } from 'drizzle-orm';
 import { fail } from '@sveltejs/kit';
 import { nanoid } from 'nanoid';
 import type { Actions, PageServerLoad } from './$types';
 
-async function getSessionUser(cookies: { get: (name: string) => string | undefined }) {
-	const sessionName = cookies.get('nd_session');
-	if (!sessionName) return null;
-	const [found] = await db.select({ id: user.id }).from(user).where(like(user.name, sessionName)).limit(1);
-	return found ?? null;
-}
 
-export const load: PageServerLoad = async ({ cookies }) => {
+export const load: PageServerLoad = async ({ cookies, locals }) => {
 	const [categories, customFields, desks] = await Promise.all([
 		db
 			.select({ id: category.id, name: category.name, slug: category.slug, description: category.description })
@@ -41,7 +35,12 @@ export const load: PageServerLoad = async ({ cookies }) => {
 		stages: stages.filter((s) => s.deskId === d.id),
 	}));
 
-	return { categories, customFields, desks: desksWithStages };
+	const users = await db
+		.select({ id: user.id, name: user.name, email: user.email, image: user.image, role: user.role, createdAt: user.createdAt })
+		.from(user)
+		.orderBy(asc(user.name));
+
+	return { categories, customFields, desks: desksWithStages, users, currentUser: locals.user };
 };
 
 export const actions: Actions = {
@@ -128,7 +127,7 @@ export const actions: Actions = {
 		return { cfDeleted: true };
 	},
 
-	createDesk: async ({ request, cookies }) => {
+	createDesk: async ({ request, locals }) => {
 		const data = await request.formData();
 		const name = data.get('name')?.toString().trim();
 		const description = data.get('description')?.toString().trim() || null;
@@ -138,8 +137,7 @@ export const actions: Actions = {
 			return fail(400, { deskCreateError: 'Desk name is required' });
 		}
 
-		const currentUser = await getSessionUser(cookies);
-		const fallbackUser = currentUser ?? (await db.select({ id: user.id }).from(user).limit(1))[0];
+		const fallbackUser = locals.user ?? (await db.select({ id: user.id }).from(user).limit(1))[0];
 		if (!fallbackUser) return fail(401, { deskCreateError: 'Not authenticated' });
 
 		try {
@@ -192,5 +190,23 @@ export const actions: Actions = {
 
 		await db.delete(stage).where(eq(stage.id, id));
 		return { stageDeleted: true };
+	},
+
+	updateUserRole: async ({ request, locals }) => {
+		if (!locals.user || locals.user.role !== 'admin') {
+			return fail(403, { roleError: 'Only admins can change user roles' });
+		}
+
+		const data = await request.formData();
+		const userId = data.get('userId')?.toString();
+		const role = data.get('role')?.toString();
+
+		if (!userId || !role) return fail(400, { roleError: 'User ID and role are required' });
+
+		const validRoles = ['admin', 'editor', 'journalist', 'viewer'];
+		if (!validRoles.includes(role)) return fail(400, { roleError: 'Invalid role' });
+
+		await db.update(user).set({ role }).where(eq(user.id, userId));
+		return { roleUpdated: true };
 	},
 };

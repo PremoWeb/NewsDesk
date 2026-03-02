@@ -1,7 +1,6 @@
 import { createAuthClient } from 'better-auth/svelte';
 
-export const authClient = createAuthClient({
-	baseURL: typeof window !== 'undefined' ? window.location.origin : '',
-});
+const authClient = createAuthClient();
 
 export const { signIn, signUp, signOut, useSession } = authClient;
+export default authClient;

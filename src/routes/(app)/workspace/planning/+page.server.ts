@@ -1,17 +1,12 @@
 import { db } from '$lib/server/db';
 import { planningEvent, planningItem, user, article } from '$lib/server/db/schema';
-import { eq, desc, asc, isNull, like } from 'drizzle-orm';
+import { eq, desc, asc, isNull } from 'drizzle-orm';
 import { fail } from '@sveltejs/kit';
 import { nanoid } from 'nanoid';
 import type { PageServerLoad, Actions } from './$types';
 
-export const load: PageServerLoad = async ({ cookies }) => {
-	const sessionName = cookies.get('nd_session');
-	let currentUser = null;
-	if (sessionName) {
-		const found = await db.select({ id: user.id, name: user.name }).from(user).where(like(user.name, sessionName)).limit(1);
-		currentUser = found[0] ?? null;
-	}
+export const load: PageServerLoad = async ({ locals }) => {
+	const currentUser = locals.user;
 
 	const events = await db
 		.select({
@@ -69,12 +64,11 @@ export const load: PageServerLoad = async ({ cookies }) => {
 };
 
 export const actions: Actions = {
-	createEvent: async ({ request, cookies }) => {
-		const sessionName = cookies.get('nd_session');
-		const creatorRows = sessionName
-			? await db.select({ id: user.id }).from(user).where(like(user.name, sessionName)).limit(1)
-			: [];
-		const createdBy = creatorRows[0]?.id ?? null;
+	createEvent: async ({ request, locals }) => {
+		const createdBy = locals.user?.id;
+		if (!createdBy) {
+			return fail(401, { message: 'Unauthorized' });
+		}
 
 		const data = await request.formData();
 		const title = data.get('title') as string;
@@ -120,12 +114,11 @@ export const actions: Actions = {
 		return { success: true };
 	},
 
-	createItem: async ({ request, cookies }) => {
-		const sessionName = cookies.get('nd_session');
-		const creatorRows = sessionName
-			? await db.select({ id: user.id }).from(user).where(like(user.name, sessionName)).limit(1)
-			: [];
-		const createdBy = creatorRows[0]?.id ?? null;
+	createItem: async ({ request, locals }) => {
+		const createdBy = locals.user?.id;
+		if (!createdBy) {
+			return fail(401, { message: 'Unauthorized' });
+		}
 
 		const data = await request.formData();
 		const eventId = (data.get('eventId') as string) || null;

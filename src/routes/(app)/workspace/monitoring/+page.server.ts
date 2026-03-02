@@ -1,7 +1,7 @@
 import { db } from '$lib/server/db';
 import { article, user } from '$lib/server/db/schema';
 import { eq, desc } from 'drizzle-orm';
-import type { PageServerLoad } from './$types';
+import type { ServerLoad } from '@sveltejs/kit';
 
 const baseSelect = {
 	id: article.id,
@@ -18,7 +18,7 @@ const baseSelect = {
 	},
 };
 
-export const load: PageServerLoad = async () => {
+export const load: ServerLoad = async () => {
 	const working = await db
 		.select(baseSelect)
 		.from(article)

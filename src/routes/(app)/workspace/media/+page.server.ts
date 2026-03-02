@@ -1,21 +1,15 @@
 import { db } from '$lib/server/db';
 import { mediaAsset, user } from '$lib/server/db/schema';
-import { eq, desc, like } from 'drizzle-orm';
+import { eq, desc } from 'drizzle-orm';
 import { fail } from '@sveltejs/kit';
 import { nanoid } from 'nanoid';
 import { writeFile, mkdir } from 'fs/promises';
 import { join } from 'path';
 import type { PageServerLoad, Actions } from './$types';
 
-async function getSessionUser(cookies: Parameters<PageServerLoad>[0]['cookies']) {
-	const sessionName = cookies.get('nd_session');
-	if (!sessionName) return null;
-	const found = await db.select({ id: user.id, name: user.name }).from(user).where(like(user.name, sessionName)).limit(1);
-	return found[0] ?? null;
-}
 
-export const load: PageServerLoad = async ({ cookies }) => {
-	const currentUser = await getSessionUser(cookies);
+export const load: PageServerLoad = async ({ locals }) => {
+	const currentUser = locals.user;
 	const assets = await db
 		.select({
 			id: mediaAsset.id,
@@ -48,10 +42,9 @@ export const load: PageServerLoad = async ({ cookies }) => {
 };
 
 export const actions: Actions = {
-	upload: async ({ request, cookies }) => {
-		const currentUser = await getSessionUser(cookies);
+	upload: async ({ request, locals }) => {
 		// Fall back to first user in DB during dev if session not found
-		const fallbackUser = currentUser ?? (await db.select({ id: user.id }).from(user).limit(1))[0];
+		const fallbackUser = locals.user ?? (await db.select({ id: user.id }).from(user).limit(1))[0];
 		if (!fallbackUser) {
 			return fail(401, { message: 'Not authenticated' });
 		}

@@ -70,14 +70,12 @@
 		"@tiptap/starter-kit": "^3.20.0",
 		"better-auth": "^1.5.0",
 		"bits-ui": "^2.16.2",
+		"casbin": "^5.49.0",
 		"formsnap": "^2.0.1",
 		"mode-watcher": "^1.1.0",
 		"nanoid": "^5.1.6",
 		"svelte-sonner": "^1.0.7",
 		"sveltekit-superforms": "^2.30.0",
 		"zod": "^4.3.6"
-	},
-	"overrides": {
-		"@better-auth/core": "1.5.0"
 	}
 }

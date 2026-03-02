@@ -1,12 +1,10 @@
-import type { User, Session } from 'better-auth/minimal';
-
 // See https://svelte.dev/docs/kit/types#app.d.ts
 // for information about these interfaces
 declare global {
 	namespace App {
 		interface Locals {
-			user?: User;
-			session?: Session;
+			user: { id: string; name: string; email: string; image: string | null; role?: string } | null;
+			session?: Record<string, unknown> | null;
 		}
 
 		// interface Error {}

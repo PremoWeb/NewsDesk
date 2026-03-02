@@ -21,7 +21,7 @@
 				password,
 			});
 
-			if (result.error) {
+			if (typeof result === 'object' && result !== null && 'error' in result && result.error) {
 				error = result.error.message || 'Failed to sign in';
 			} else {
 				goto('/workspace/monitoring');

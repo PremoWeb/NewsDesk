@@ -17,7 +17,7 @@ export default defineConfig({
 		strictPort: true
 	},
 	ssr: {
-		noExternal: ['svelte-sonner']
+		noExternal: ['svelte-sonner', 'better-auth']
 	},
 	test: {
 		expect: { requireAssertions: true },

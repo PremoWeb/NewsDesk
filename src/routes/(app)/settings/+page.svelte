@@ -474,6 +474,58 @@
 				</form>
 			</section>
 
+			<!-- User Management (admin only) -->
+			{#if data.currentUser?.role === 'admin'}
+			<section class="mt-10 space-y-4">
+				<div>
+					<h2 class="text-base font-semibold">User Management</h2>
+					<p class="text-muted-foreground text-sm">Manage user roles across the newsroom.</p>
+				</div>
+				<Separator />
+				<div class="space-y-2">
+					{#each data.users as u (u.id)}
+						<div class="flex items-center justify-between rounded-md border px-3 py-2">
+							<div class="flex items-center gap-3 min-w-0">
+								{#if u.image}
+									<img src={u.image} alt={u.name} class="h-7 w-7 rounded-full object-cover flex-shrink-0" />
+								{:else}
+									<div class="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium">
+										{u.name.slice(0, 1).toUpperCase()}
+									</div>
+								{/if}
+								<div class="min-w-0">
+									<p class="truncate text-sm font-medium">{u.name}</p>
+									<p class="truncate text-xs text-muted-foreground">{u.email}</p>
+								</div>
+							</div>
+							<form method="POST" action="?/updateUserRole" use:enhance={() => {
+								return async ({ result, update }) => {
+									if (result.type === 'success') toast.success(`Role updated for ${u.name}`);
+									else toast.error(`Failed to update role for ${u.name}`);
+									await update();
+								};
+							}}>
+								<input type="hidden" name="userId" value={u.id} />
+								<select
+									name="role"
+									onchange={(e) => e.currentTarget.form?.requestSubmit()}
+									class="h-7 rounded border bg-background px-2 text-xs"
+									disabled={u.id === data.currentUser?.id}
+								>
+									{#each ['admin', 'editor', 'journalist', 'viewer'] as role}
+										<option value={role} selected={u.role === role}>{role}</option>
+									{/each}
+								</select>
+							</form>
+						</div>
+					{/each}
+					{#if data.users.length === 0}
+						<p class="text-sm text-muted-foreground">No users found.</p>
+					{/if}
+				</div>
+			</section>
+			{/if}
+
 			<!-- Danger Zone -->
 			<section class="mt-10 space-y-4">
 				<div>
