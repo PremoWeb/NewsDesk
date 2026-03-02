@@ -20,7 +20,7 @@ export default defineConfig({
 		}
 	},
 	ssr: {
-		noExternal: ['svelte-sonner']
+		noExternal: ['svelte-sonner', 'better-auth', /^@better-auth\//]
 	},
 	test: {
 		expect: { requireAssertions: true },
