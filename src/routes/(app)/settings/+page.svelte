@@ -25,6 +25,12 @@
 	let cfPlaceholder = $state('');
 	let cfRequired = $state(false);
 
+	let creatingDesk = $state(false);
+	let newDeskName = $state('');
+	let newDeskDescription = $state('');
+	let newDeskColor = $state('#6366f1');
+	let expandedDeskId = $state<string | null>(null);
+
 	function handleSave(e: SubmitEvent) {
 		e.preventDefault();
 		saving = true;
@@ -342,6 +348,128 @@
 					</div>
 					<Button type="submit" size="sm" disabled={creatingCustomField || !cfName.trim()}>
 						{creatingCustomField ? 'Adding...' : 'Add Custom Field'}
+					</Button>
+				</form>
+			</section>
+
+			<!-- Desks -->
+			<section class="mt-10 space-y-4">
+				<div>
+					<h2 class="text-base font-semibold">Desks</h2>
+					<p class="text-muted-foreground text-sm">Organise your newsroom into desks with workflow stages.</p>
+				</div>
+				<Separator />
+
+				{#if data.desks.length > 0}
+					<div class="space-y-2">
+						{#each data.desks as d (d.id)}
+							<div class="rounded-md border">
+								<!-- Desk header -->
+								<div class="flex items-center justify-between px-3 py-2">
+									<button
+										type="button"
+										class="flex items-center gap-2 flex-1 text-left"
+										onclick={() => expandedDeskId = expandedDeskId === d.id ? null : d.id}
+									>
+										<span class="inline-block h-3 w-3 rounded-full flex-shrink-0" style="background-color: {d.color}"></span>
+										<p class="text-sm font-medium">{d.name}</p>
+										{#if d.description}
+											<p class="text-muted-foreground text-xs truncate">{d.description}</p>
+										{/if}
+										<span class="text-muted-foreground text-xs ml-auto mr-2">{d.stages.length} stages</span>
+									</button>
+									<form method="POST" action="?/deleteDesk" use:enhance={() => {
+										return async ({ result, update }) => {
+											if (result.type === 'success') toast.success('Desk deleted.');
+											else toast.error('Failed to delete desk.');
+											await update();
+										};
+									}}>
+										<input type="hidden" name="id" value={d.id} />
+										<Button variant="ghost" size="icon" type="submit" class="text-muted-foreground hover:text-destructive h-8 w-8">
+											<Trash2 class="h-4 w-4" />
+										</Button>
+									</form>
+								</div>
+								<!-- Stages list (collapsible) -->
+								{#if expandedDeskId === d.id}
+									<div class="border-t px-3 py-3 space-y-2 bg-muted/30">
+										<p class="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Workflow Stages</p>
+										{#each d.stages as s (s.id)}
+											<div class="flex items-center justify-between rounded border bg-background px-2 py-1">
+												<div class="flex items-center gap-2">
+													<span class="inline-block h-2.5 w-2.5 rounded-full" style="background-color: {s.color}"></span>
+													<span class="text-sm">{s.name}</span>
+												</div>
+												<form method="POST" action="?/deleteStage" use:enhance={() => {
+													return async ({ result, update }) => {
+														if (result.type === 'success') toast.success('Stage deleted.');
+														else toast.error('Failed to delete stage.');
+														await update();
+													};
+												}}>
+													<input type="hidden" name="id" value={s.id} />
+													<Button variant="ghost" size="icon" type="submit" class="text-muted-foreground hover:text-destructive h-7 w-7">
+														<Trash2 class="h-3.5 w-3.5" />
+													</Button>
+												</form>
+											</div>
+										{/each}
+										<!-- Add stage form -->
+										<form method="POST" action="?/createStage" use:enhance={() => {
+											return async ({ result, update }) => {
+												if (result.type === 'success') toast.success('Stage added.');
+												else toast.error('Failed to add stage.');
+												await update();
+											};
+										}} class="flex gap-2 pt-1">
+											<input type="hidden" name="deskId" value={d.id} />
+											<Input name="name" placeholder="New stage name" class="h-8 text-sm flex-1" required />
+											<input type="color" name="color" value="#94a3b8" class="h-8 w-10 rounded border cursor-pointer" />
+											<Button type="submit" size="sm" class="h-8">Add</Button>
+										</form>
+									</div>
+								{/if}
+							</div>
+						{/each}
+					</div>
+				{:else}
+					<p class="text-muted-foreground text-sm">No desks yet. Create one to organise your newsroom.</p>
+				{/if}
+
+				<!-- Create new desk -->
+				<form method="POST" action="?/createDesk" use:enhance={() => {
+					creatingDesk = true;
+					return async ({ result, update }) => {
+						creatingDesk = false;
+						if (result.type === 'success') {
+							toast.success('Desk created successfully.');
+							newDeskName = '';
+							newDeskDescription = '';
+						} else if (result.type === 'failure') {
+							const msg = (result.data as { deskCreateError?: string })?.deskCreateError;
+							toast.error(msg ?? 'Failed to create desk.');
+						}
+						await update();
+					};
+				}} class="rounded-md border p-4 space-y-3">
+					<h3 class="text-sm font-semibold">Create Desk</h3>
+					<div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+						<div class="space-y-2">
+							<Label for="desk-name">Name <span class="text-destructive">*</span></Label>
+							<Input id="desk-name" name="name" placeholder="e.g. Sports Desk" bind:value={newDeskName} required />
+						</div>
+						<div class="space-y-2">
+							<Label for="desk-color">Color</Label>
+							<input id="desk-color" name="color" type="color" bind:value={newDeskColor} class="h-9 w-full rounded-md border cursor-pointer" />
+						</div>
+					</div>
+					<div class="space-y-2">
+						<Label for="desk-description">Description</Label>
+						<Input id="desk-description" name="description" placeholder="Optional description" bind:value={newDeskDescription} />
+					</div>
+					<Button type="submit" size="sm" disabled={creatingDesk || !newDeskName.trim()}>
+						{creatingDesk ? 'Creating...' : 'Create Desk'}
 					</Button>
 				</form>
 			</section>

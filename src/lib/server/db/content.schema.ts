@@ -209,6 +209,59 @@ export const planningItem = pgTable(
 	],
 );
 
+// Desks table (newsroom organizational units)
+export const desk = pgTable("desk", {
+	id: text("id").primaryKey(),
+	name: text("name").notNull().unique(),
+	description: text("description"),
+	color: text("color").notNull().default("#6366f1"),
+	createdAt: timestamp("created_at").defaultNow().notNull(),
+	createdBy: text("created_by")
+		.notNull()
+		.references(() => user.id, { onDelete: "cascade" }),
+});
+
+// Stages table (workflow stages within a desk)
+export const stage = pgTable(
+	"stage",
+	{
+		id: text("id").primaryKey(),
+		deskId: text("desk_id")
+			.notNull()
+			.references(() => desk.id, { onDelete: "cascade" }),
+		name: text("name").notNull(),
+		order: integer("order").notNull().default(0),
+		color: text("color").notNull().default("#94a3b8"),
+		createdAt: timestamp("created_at").defaultNow().notNull(),
+	},
+	(table) => [
+		index("stage_deskId_idx").on(table.deskId),
+		index("stage_order_idx").on(table.order),
+	],
+);
+
+// Article comments table
+export const articleComment = pgTable(
+	"article_comment",
+	{
+		id: text("id").primaryKey(),
+		articleId: text("article_id")
+			.notNull()
+			.references(() => article.id, { onDelete: "cascade" }),
+		authorId: text("author_id")
+			.notNull()
+			.references(() => user.id, { onDelete: "cascade" }),
+		body: text("body").notNull(),
+		createdAt: timestamp("created_at").defaultNow().notNull(),
+		updatedAt: timestamp("updated_at").defaultNow().notNull(),
+		resolvedAt: timestamp("resolved_at"),
+	},
+	(table) => [
+		index("article_comment_articleId_idx").on(table.articleId),
+		index("article_comment_authorId_idx").on(table.authorId),
+	],
+);
+
 // Relations
 export const articleRelations = relations(article, ({ one, many }) => ({
 	author: one(user, { fields: [article.authorId], references: [user.id] }),
@@ -216,6 +269,7 @@ export const articleRelations = relations(article, ({ one, many }) => ({
 	articleCategories: many(articleCategory),
 	articleTags: many(articleTag),
 	customFieldValues: many(articleCustomFieldValue),
+	comments: many(articleComment),
 }));
 
 export const categoryRelations = relations(category, ({ many }) => ({
@@ -259,4 +313,18 @@ export const planningItemRelations = relations(planningItem, ({ one }) => ({
 	assignedUser: one(user, { fields: [planningItem.assignedTo], references: [user.id] }),
 	article: one(article, { fields: [planningItem.articleId], references: [article.id] }),
 	creator: one(user, { fields: [planningItem.createdBy], references: [user.id] }),
+}));
+
+export const deskRelations = relations(desk, ({ one, many }) => ({
+	creator: one(user, { fields: [desk.createdBy], references: [user.id] }),
+	stages: many(stage),
+}));
+
+export const stageRelations = relations(stage, ({ one }) => ({
+	desk: one(desk, { fields: [stage.deskId], references: [desk.id] }),
+}));
+
+export const articleCommentRelations = relations(articleComment, ({ one }) => ({
+	article: one(article, { fields: [articleComment.articleId], references: [article.id] }),
+	author: one(user, { fields: [articleComment.authorId], references: [user.id] }),
 }));

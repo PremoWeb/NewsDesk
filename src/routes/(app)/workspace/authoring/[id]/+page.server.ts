@@ -1,9 +1,16 @@
 import { db } from '$lib/server/db';
-import { article, user, tag, articleTag, category, articleCategory, customField, articleCustomFieldValue } from '$lib/server/db/schema';
-import { eq } from 'drizzle-orm';
+import { article, user, tag, articleTag, category, articleCategory, customField, articleCustomFieldValue, articleComment } from '$lib/server/db/schema';
+import { eq, desc, like } from 'drizzle-orm';
 import { fail, redirect, error } from '@sveltejs/kit';
 import { nanoid } from 'nanoid';
 import type { Actions, PageServerLoad } from './$types';
+
+async function getSessionUser(cookies: { get: (name: string) => string | undefined }) {
+	const sessionName = cookies.get('nd_session');
+	if (!sessionName) return null;
+	const [found] = await db.select({ id: user.id, name: user.name }).from(user).where(like(user.name, sessionName)).limit(1);
+	return found ?? null;
+}
 
 export const load: PageServerLoad = async ({ params }) => {
 	const [art] = await db
@@ -78,6 +85,21 @@ export const load: PageServerLoad = async ({ params }) => {
 
 	const customFieldValues = Object.fromEntries(cfValues.map((v) => [v.fieldId, v.value ?? '']));
 
+	// Fetch comments with author info
+	const comments = await db
+		.select({
+			id: articleComment.id,
+			body: articleComment.body,
+			createdAt: articleComment.createdAt,
+			resolvedAt: articleComment.resolvedAt,
+			authorId: articleComment.authorId,
+			authorName: user.name,
+		})
+		.from(articleComment)
+		.leftJoin(user, eq(articleComment.authorId, user.id))
+		.where(eq(articleComment.articleId, params.id))
+		.orderBy(desc(articleComment.createdAt));
+
 	return {
 		article: art,
 		authors,
@@ -86,6 +108,7 @@ export const load: PageServerLoad = async ({ params }) => {
 		articleCategories: artCategories.map((c) => c.id),
 		customFields,
 		customFieldValues,
+		comments,
 	};
 };
 
@@ -105,6 +128,7 @@ export const actions: Actions = {
 			| 'archived';
 		const priority = data.get('priority')?.toString() as 'low' | 'medium' | 'high' | 'urgent';
 		const authorId = data.get('authorId')?.toString();
+		const assignedTo = data.get('assignedTo')?.toString() || null;
 		const featured = data.get('featured') === 'on';
 
 		if (!headline) {
@@ -130,6 +154,7 @@ export const actions: Actions = {
 				status,
 				priority,
 				authorId,
+				assignedTo,
 				featured,
 				wordCount,
 				readTime,
@@ -191,5 +216,43 @@ export const actions: Actions = {
 	delete: async ({ params }) => {
 		await db.delete(article).where(eq(article.id, params.id));
 		redirect(303, '/workspace/authoring');
+	},
+
+	addComment: async ({ request, params, cookies }) => {
+		const data = await request.formData();
+		const body = data.get('body')?.toString().trim();
+
+		if (!body) return fail(400, { commentError: 'Comment cannot be empty' });
+
+		const currentUser = await getSessionUser(cookies);
+		const fallbackUser = currentUser ?? (await db.select({ id: user.id }).from(user).limit(1))[0];
+		if (!fallbackUser) return fail(401, { commentError: 'Not authenticated' });
+
+		await db.insert(articleComment).values({
+			id: nanoid(),
+			articleId: params.id,
+			authorId: fallbackUser.id,
+			body,
+		});
+
+		return { commentAdded: true };
+	},
+
+	resolveComment: async ({ request }) => {
+		const data = await request.formData();
+		const id = data.get('id')?.toString();
+		if (!id) return fail(400, { commentError: 'Comment ID required' });
+
+		await db.update(articleComment).set({ resolvedAt: new Date() }).where(eq(articleComment.id, id));
+		return { commentResolved: true };
+	},
+
+	deleteComment: async ({ request }) => {
+		const data = await request.formData();
+		const id = data.get('id')?.toString();
+		if (!id) return fail(400, { commentError: 'Comment ID required' });
+
+		await db.delete(articleComment).where(eq(articleComment.id, id));
+		return { commentDeleted: true };
 	},
 };

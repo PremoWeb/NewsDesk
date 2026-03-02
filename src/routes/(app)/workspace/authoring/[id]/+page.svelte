@@ -10,6 +10,7 @@
 	import { Label } from '$lib/components/ui/label';
 	import { Textarea } from '$lib/components/ui/textarea';
 	import { Badge } from '$lib/components/ui/badge';
+	import { Separator } from '$lib/components/ui/separator';
 	import RichTextEditor from '$lib/components/editor/RichTextEditor.svelte';
 	import TagInput from '$lib/components/ui/tag-input/TagInput.svelte';
 	import type { PageData, ActionData } from './$types';
@@ -37,6 +38,8 @@
 	let saveStatus = $state<'idle' | 'saving' | 'saved' | 'error'>('idle');
 	let autoSaveTimer: ReturnType<typeof setTimeout> | undefined;
 	let formEl: HTMLFormElement;
+	let newComment = $state('');
+	let addingComment = $state(false);
 
 	function scheduleAutoSave() {
 		clearTimeout(autoSaveTimer);
@@ -80,6 +83,20 @@
 			hour: 'numeric',
 			minute: '2-digit',
 		}).format(new Date(d));
+	}
+
+	function formatRelativeTime(d: Date | string | null) {
+		if (!d) return '';
+		const date = new Date(d);
+		const now = new Date();
+		const diffMs = now.getTime() - date.getTime();
+		const diffMins = Math.floor(diffMs / 60000);
+		const diffHours = Math.floor(diffMs / 3600000);
+		const diffDays = Math.floor(diffMs / 86400000);
+		if (diffMins < 1) return 'just now';
+		if (diffMins < 60) return `${diffMins}m ago`;
+		if (diffHours < 24) return `${diffHours}h ago`;
+		return `${diffDays}d ago`;
 	}
 </script>
 
@@ -221,8 +238,8 @@
 					/>
 				</div>
 
-				<!-- Row: Status + Priority + Author -->
-				<div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+				<!-- Row: Status + Priority + Author + Assigned To -->
+				<div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
 					<!-- Status -->
 					<div class="space-y-2">
 						<Label for="status">Status</Label>
@@ -266,6 +283,23 @@
 						>
 							{#each data.authors as author (author.id)}
 								<option value={author.id} selected={author.id === art.authorId}>
+									{author.name}
+								</option>
+							{/each}
+						</select>
+					</div>
+
+					<!-- Assigned To -->
+					<div class="space-y-2">
+						<Label for="assignedTo">Assigned To</Label>
+						<select
+							id="assignedTo"
+							name="assignedTo"
+							class="border-input bg-background ring-offset-background focus-visible:ring-ring flex h-9 w-full rounded-md border px-3 py-1 text-sm shadow-sm transition-colors focus-visible:ring-1 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+						>
+							<option value="">— Unassigned —</option>
+							{#each data.authors as author (author.id)}
+								<option value={author.id} selected={author.id === art.assignedTo}>
 									{author.name}
 								</option>
 							{/each}
@@ -399,6 +433,97 @@
 					</Button>
 				</div>
 			</form>
+
+			<!-- Comments Section -->
+			<div class="mt-12 border-t pt-8">
+				<h2 class="mb-4 text-sm font-semibold">
+					Comments
+					{#if data.comments.length > 0}
+						<span class="text-muted-foreground ml-1 font-normal">({data.comments.length})</span>
+					{/if}
+				</h2>
+
+				<!-- Add comment form -->
+				<form
+					method="POST"
+					action="?/addComment"
+					use:enhance={() => {
+						addingComment = true;
+						return async ({ result, update }) => {
+							addingComment = false;
+							if (result.type === 'success') {
+								newComment = '';
+								toast.success('Comment added.');
+							} else {
+								toast.error('Failed to add comment.');
+							}
+							await update();
+						};
+					}}
+					class="mb-6 space-y-2"
+				>
+					<Textarea
+						name="body"
+						placeholder="Add a comment or note..."
+						rows={3}
+						bind:value={newComment}
+						class="text-sm"
+					/>
+					<div class="flex justify-end">
+						<Button type="submit" size="sm" disabled={addingComment || !newComment.trim()}>
+							{addingComment ? 'Posting...' : 'Post Comment'}
+						</Button>
+					</div>
+				</form>
+
+				<!-- Comment list -->
+				{#if data.comments.length > 0}
+					<div class="space-y-4">
+						{#each data.comments as comment (comment.id)}
+							<div class="rounded-md border px-4 py-3 {comment.resolvedAt ? 'opacity-50' : ''}">
+								<div class="mb-2 flex items-center justify-between gap-2">
+									<div class="flex items-center gap-2">
+										<span class="text-sm font-medium">{comment.authorName ?? 'Unknown'}</span>
+										<span class="text-muted-foreground text-xs">{formatRelativeTime(comment.createdAt)}</span>
+										{#if comment.resolvedAt}
+											<span class="rounded bg-green-100 px-1.5 py-0.5 text-xs text-green-700">Resolved</span>
+										{/if}
+									</div>
+									<div class="flex items-center gap-1">
+										{#if !comment.resolvedAt}
+											<form method="POST" action="?/resolveComment" use:enhance={() => {
+												return async ({ result, update }) => {
+													if (result.type === 'success') toast.success('Comment resolved.');
+													await update();
+												};
+											}}>
+												<input type="hidden" name="id" value={comment.id} />
+												<Button variant="ghost" size="sm" type="submit" class="h-7 text-xs text-muted-foreground hover:text-green-600">
+													Resolve
+												</Button>
+											</form>
+										{/if}
+										<form method="POST" action="?/deleteComment" use:enhance={() => {
+											return async ({ result, update }) => {
+												if (result.type === 'success') toast.success('Comment deleted.');
+												await update();
+											};
+										}}>
+											<input type="hidden" name="id" value={comment.id} />
+											<Button variant="ghost" size="sm" type="submit" class="h-7 text-xs text-muted-foreground hover:text-destructive">
+												Delete
+											</Button>
+										</form>
+									</div>
+								</div>
+								<p class="text-sm whitespace-pre-wrap">{comment.body}</p>
+							</div>
+						{/each}
+					</div>
+				{:else}
+					<p class="text-muted-foreground text-sm">No comments yet.</p>
+				{/if}
+			</div>
 		</div>
 		</div>
 	</PageContent>
